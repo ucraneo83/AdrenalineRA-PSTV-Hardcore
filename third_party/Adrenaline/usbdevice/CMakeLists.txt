@@ -18,6 +18,12 @@ add_executable(usbdevice
   main.c
 )
 
+set_target_properties(TARGET_NAME PROPERTIES
+  C_STANDARD 17
+  C_STANDARD_REQUIRED YES
+  C_EXTENSIONS YES
+)
+
 target_link_libraries(usbdevice
   SceUdcdForDriver_stub
   SceIofilemgrForDriver_stub
