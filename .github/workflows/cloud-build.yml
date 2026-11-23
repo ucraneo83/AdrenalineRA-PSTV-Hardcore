@@ -66,7 +66,12 @@ jobs:
           print("Hook locations verified.")
           print("No unsafe automatic substitutions applied.")
           PY
-
+ - name: Inspect taiHEN macro
+        shell: bash
+        run: |
+          set -euxo pipefail
+          find /usr/local/vitasdk -name taihen.h -print
+          grep -R -A 15 '#define TAI_CONTINUE' /usr/local/vitasdk/arm-vita-eabi/include/ || true
       - name: Configure and compile
         shell: bash
         run: |
