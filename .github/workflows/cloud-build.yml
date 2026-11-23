@@ -38,13 +38,30 @@ jobs:
           command -v vita-make-fself
           test -f "$VITASDK/share/vita.toolchain.cmake"
 
-      - name: Inspect taiHEN macro
+       - name: Apply GCC 15 taiHEN compatibility fix
         shell: bash
         run: |
           set -euxo pipefail
-          find /usr/local/vitasdk -name taihen.h -print
-          grep -R -A 15 '#define TAI_CONTINUE' \
-            /usr/local/vitasdk/arm-vita-eabi/include/ || true
+          python3 - <<'PY'
+          from pathlib import Path
+
+          header = Path(
+              "/usr/local/vitasdk/arm-vita-eabi/include/taihen.h"
+          )
+          source = header.read_text()
+
+          old = "((type(*)())"
+          new = "((type(*)(...))"
+
+          count = source.count(old)
+          if count != 2:
+              raise SystemExit(
+                  f"Expected 2 taiHEN casts, found {count}"
+              )
+
+          header.write_text(source.replace(old, new))
+          print("Patched both taiHEN continuation casts.")
+          PY
 
       - name: Configure and compile
         shell: bash
