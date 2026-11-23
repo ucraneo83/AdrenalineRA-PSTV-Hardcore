@@ -19,6 +19,12 @@ add_executable(adrenaline_kernel
   utils.c
 )
 
+set_target_properties(adrenaline_kernel PROPERTIES
+  C_STANDARD 17
+  C_STANDARD_REQUIRED YES
+  C_EXTENSIONS YES
+)
+
 target_link_libraries(adrenaline_kernel
   taihenForKernel_stub
   taihenModuleUtils_stub
