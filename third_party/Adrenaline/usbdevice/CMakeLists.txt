@@ -18,7 +18,7 @@ add_executable(usbdevice
   main.c
 )
 
-set_target_properties(TARGET_NAME PROPERTIES
+set_target_properties(usbdevice PROPERTIES
   C_STANDARD 17
   C_STANDARD_REQUIRED YES
   C_EXTENSIONS YES
