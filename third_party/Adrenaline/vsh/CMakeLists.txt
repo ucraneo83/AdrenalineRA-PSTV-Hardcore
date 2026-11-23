@@ -18,6 +18,12 @@ add_executable(adrenaline_vsh
   main.c
 )
 
+set_target_properties(TARGET_NAME PROPERTIES
+  C_STANDARD 17
+  C_STANDARD_REQUIRED YES
+  C_EXTENSIONS YES
+)
+
 target_link_directories(adrenaline_vsh PRIVATE ${CMAKE_BINARY_DIR}/kernel)
 
 target_link_libraries(adrenaline_vsh
