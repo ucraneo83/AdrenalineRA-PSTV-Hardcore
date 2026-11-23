@@ -1,0 +1,9 @@
+name: PSTV static guardrails
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check known security invariants
+        run: python3 tools/static_guardrails.py
