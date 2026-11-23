@@ -205,12 +205,13 @@ add_executable(adrenaline_user
 add_dependencies(adrenaline_user libvita2dfbo)
 add_dependencies(adrenaline_user vitashadercollection)
 
-target_compile_options(adrenaline_user PRIVATE -Os)
+set_target_properties(adrenaline_user PROPERTIES
+  C_STANDARD 17
+  C_STANDARD_REQUIRED YES
+  C_EXTENSIONS YES
+)
 
-# core/server/ra_gate.h defines static helpers with internal linkage; a unit that includes
-# it without calling them cannot avoid the unused-function warning, and the header is
-# shared with the PSP-side modules. Project sources keep their own unused statics out.
-target_compile_options(adrenaline_user PRIVATE -Wno-unused-function)
+target_compile_options(adrenaline_user PRIVATE -Os)
 
 if(RA_DEV_BUILD)
   target_compile_definitions(adrenaline_user PRIVATE RA_DEV_BUILD=1)
