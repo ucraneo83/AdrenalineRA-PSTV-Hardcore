@@ -38,40 +38,14 @@ jobs:
           command -v vita-make-fself
           test -f "$VITASDK/share/vita.toolchain.cmake"
 
-      - name: Apply GCC 15 taiHEN compatibility patch
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("third_party/Adrenaline/kernel/main.c")
-          source = path.read_text()
-
-          # GCC 15 rejects the legacy taiHEN macro's
-          # zero-argument function-pointer declaration.
-          # Use explicit typed function pointers instead.
-          replacements = {
-              "TAI_CONTINUE(SceUID, ksceKernelAllocMemBlockRef, name, type, size, optp)":
-                  "TAI_CONTINUE(SceUID, ksceKernelAllocMemBlockRef, name, type, size, optp)",
-          }
-
-          # The actual taiHEN macro definition must be
-          # checked before modifying the hook signatures.
-          # Keep the source unchanged until that verification.
-          for old in replacements:
-              if old not in source:
-                  raise SystemExit(f"Expected hook missing: {old}")
-
-          print("Hook locations verified.")
-          print("No unsafe automatic substitutions applied.")
-          PY
- - name: Inspect taiHEN macro
+      - name: Inspect taiHEN macro
         shell: bash
         run: |
           set -euxo pipefail
           find /usr/local/vitasdk -name taihen.h -print
-          grep -R -A 15 '#define TAI_CONTINUE' /usr/local/vitasdk/arm-vita-eabi/include/ || true
+          grep -R -A 15 '#define TAI_CONTINUE' \
+            /usr/local/vitasdk/arm-vita-eabi/include/ || true
+
       - name: Configure and compile
         shell: bash
         run: |
