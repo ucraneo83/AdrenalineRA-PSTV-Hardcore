@@ -1,0 +1,18 @@
+#ifndef ADRENALINE_IDENTITY_H
+#define ADRENALINE_IDENTITY_H
+
+#define ADRENALINE_TITLEID "@ADRENALINE_TITLEID@"
+#define ADRENALINE_VSH_MODULE_NAME "AdrenalineVsh@ADRENALINE_MODULE_SUFFIX@"
+#define ADRENALINE_USER_MODULE_NAME "AdrenalineUser@ADRENALINE_MODULE_SUFFIX@"
+#cmakedefine01 ADRENALINE_TEST_PROFILE
+#cmakedefine01 ADRENALINE_TEST_REPLACEMENT
+#define ADRENALINE_TEST_DATA_ROOT "ux0:data/" ADRENALINE_TITLEID
+#define ADRENALINE_TEST_MS_ROOT ADRENALINE_TEST_DATA_ROOT "/pspemu"
+#define ADRENALINE_TEST_ISO_ROOT "ux0:pspemu/ISO"
+/* PSP EBOOTs and PS1 (POPS) EBOOTs stay in the existing memory stick. Reads use
+ * this folder first; writes and files missing here go to the Test memory stick. */
+#define ADRENALINE_TEST_GAME_ROOT "ux0:pspemu/PSP/GAME"
+#define RA_DATA_ROOT_UX0 "ux0:data/@ADRENALINE_RA_DATA_DIR@"
+#define RA_DATA_ROOT_UR0 "ur0:data/@ADRENALINE_RA_DATA_DIR@"
+
+#endif

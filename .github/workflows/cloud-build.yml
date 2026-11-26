@@ -1,0 +1,66 @@
+
+name: PSTV experimental VPK build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Hardcore static audit
+        run: python3 tools/static_guardrails.py
+
+  build:
+    needs: static-audit
+    runs-on: ubuntu-latest
+    container:
+      image: vitasdk/vitasdk:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect SDK and dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export VITASDK="${VITASDK:-/usr/local/vitasdk}"
+          export PATH="$VITASDK/bin:$PATH"
+          command -v cmake
+          command -v ninja
+          command -v vita-make-fself
+          test -f "$VITASDK/share/vita.toolchain.cmake"
+
+      - name: Configure and compile with C17 compatibility
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export VITASDK="${VITASDK:-/usr/local/vitasdk}"
+          export PATH="$VITASDK/bin:$PATH"
+          export CFLAGS="${CFLAGS:-} -std=gnu17"
+          bash tools/build_pstv.sh 2>&1 | tee build.log
+
+      - name: Collect VPK and checksum
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pstv-experimental-vpk
+          path: |
+            out/pstv-release/bubble/Adrenaline.vpk
+            out/pstv-release/bubble/Adrenaline.vpk.sha256
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
