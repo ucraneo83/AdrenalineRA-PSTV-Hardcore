@@ -1,4 +1,4 @@
-AdrenalineKernel:
+AdrenalineKernel@ADRENALINE_MODULE_SUFFIX@:
   attributes: 0
   version:
     major: 1
@@ -7,7 +7,7 @@ AdrenalineKernel:
     start: module_start
     stop: module_stop
   libraries:
-    AdrenalineKubridge:
+    AdrenalineKubridge@ADRENALINE_MODULE_SUFFIX@:
       syscall: true
       functions:
         - kuCtrlPeekBufferPositive

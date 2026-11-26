@@ -40,7 +40,40 @@ enum FlashPath {
 	FLASH_APP  = 1,
 };
 
-static void buildPspemuMsfsPath(char *out_path, const char *in_path, int flash_path) {
+static int buildPspemuMsfsPath(char *out_path, const char *in_path, int flash_path, int read_only) {
+#if ADRENALINE_TEST_PROFILE
+	if (!isTestPspRelativePath(in_path)) {
+		return SCE_EINVAL;
+	}
+	while (*in_path == '/') {
+		in_path++;
+	}
+
+	if (strncmp(in_path, "__ef0__", 7) == 0 && (in_path[7] == '/' || in_path[7] == '\0')) {
+		return SCE_EINVAL;
+	}
+
+	const char *iso_suffix = getTestIsoSuffix(in_path);
+	if (iso_suffix) {
+		if (!read_only) {
+			return SCE_EINVAL;
+		}
+		int length = snprintf(out_path, MAX_PATH_LENGTH, "%s%s", ADRENALINE_TEST_ISO_ROOT, iso_suffix);
+		return (length < 0 || length >= MAX_PATH_LENGTH) ? SCE_EINVAL : 0;
+	}
+
+	const char *base = ADRENALINE_TEST_MS_ROOT;
+	if (strncmp(in_path, "__ADRENALINE__", 14) == 0 && (in_path[14] == '/' || in_path[14] == '\0')) {
+		base = flash_path == FLASH_APP ? "ux0:app/" ADRENALINE_TITLEID : ADRENALINE_TEST_DATA_ROOT;
+		in_path += 14;
+		while (*in_path == '/') {
+			in_path++;
+		}
+	}
+
+	int length = snprintf(out_path, MAX_PATH_LENGTH, "%s/%s", base, in_path);
+	return (length < 0 || length >= MAX_PATH_LENGTH) ? SCE_EINVAL : 0;
+#else
 	if (in_path[0] == '/') {
 		in_path++;
 	}
@@ -59,6 +92,27 @@ static void buildPspemuMsfsPath(char *out_path, const char *in_path, int flash_p
 	} else {
 		snprintf(out_path, MAX_PATH_LENGTH, "%s/%s", getPspemuMemoryStickLocation(), in_path);
 	}
+	return 0;
+#endif
+}
+
+static int isReadOnlyOpen(int flags) {
+#if ADRENALINE_TEST_PROFILE
+	// The PSP ISO drivers attach this mode to read-only I/O. Keep it on
+	// the Vita open call, but ignore it when checking for write access.
+	const int psp_iso_open_mode = 0x000F0000;
+	if ((flags & psp_iso_open_mode) == psp_iso_open_mode) {
+		flags &= ~psp_iso_open_mode;
+	}
+	return isTestReadOnlyOpen(flags);
+#else
+	return flags == SCE_O_RDONLY;
+#endif
+}
+
+static int canRetryInApp(int result, int flash_path, int read_only) {
+	return result == SCE_ENOENT && flash_path == FLASH_DATA &&
+	       (!ADRENALINE_TEST_PROFILE || read_only);
 }
 
 static void convertFileStat(SceIoStat *stat) {
@@ -147,7 +201,10 @@ static SceUID ScePspemuMsfsReopenFile(ScePspemuMsfsDescriptor *descriptor) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, descriptor->path, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, descriptor->path, flash_path, descriptor->folder || isReadOnlyOpen(descriptor->flags)) < 0) {
+		descriptor->fd = 0;
+		return SCE_EINVAL;
+	}
 
 	if (descriptor->folder) {
 		descriptor->fd = sceIoDopen(msfs_path);
@@ -156,7 +213,7 @@ try_again:
 		sceIoLseek(descriptor->fd, descriptor->offset, SCE_SEEK_SET);
 	}
 
-	if (descriptor->fd == SCE_ENOENT && flash_path == FLASH_DATA) {
+	if (canRetryInApp(descriptor->fd, flash_path, descriptor->folder || isReadOnlyOpen(descriptor->flags))) {
 		flash_path = FLASH_APP;
 		memset(msfs_path, 0, MAX_PATH_LENGTH);
 		goto try_again;
@@ -197,7 +254,12 @@ static SceUID ScePspemuMsfsOpen(const char *file, int flags, SceMode mode) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, file, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, file, flash_path, isReadOnlyOpen(flags)) < 0) {
+#if ADRENALINE_TEST_PROFILE
+		logTestPathError("MSFS open rejected", file, flags, SCE_EINVAL);
+#endif
+		return SCE_EINVAL;
+	}
 
 	if (file[0] == '\0') {
 		return SCE_EINVAL;
@@ -205,6 +267,9 @@ try_again:
 
 	if (flags & SCE_O_TRUNC) {
 		char msfs_path_trunc[MAX_PATH_LENGTH];
+		if (ADRENALINE_TEST_PROFILE && strlen(msfs_path) + sizeof("__TRUNC__") > sizeof(msfs_path_trunc)) {
+			return SCE_EINVAL;
+		}
 		strcpy(msfs_path_trunc, msfs_path);
 		strcat(msfs_path_trunc, "__TRUNC__");
 		if (sceIoRename(msfs_path, msfs_path_trunc) >= 0) {
@@ -219,12 +284,17 @@ try_again:
 
 	SceUID fd = sceIoOpen(msfs_path, flags, 0777);
 	if (fd < 0) {
-		if (fd == SCE_ENOENT && flash_path == FLASH_DATA) {
+		if (canRetryInApp(fd, flash_path, isReadOnlyOpen(flags))) {
 			flash_path = FLASH_APP;
 			memset(msfs_path, 0, MAX_PATH_LENGTH);
 			goto try_again;
 		}
 
+#if ADRENALINE_TEST_PROFILE
+		if (getTestIsoSuffix(file)) {
+			logTestPathError("MSFS ISO open", file, flags, fd);
+		}
+#endif
 		return fd;
 	}
 
@@ -240,12 +310,15 @@ static int ScePspemuMsfsTruncateFix(ScePspemuMsfsDescriptor *descriptor) {
 	char msfs_path_trunc[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path_trunc, descriptor->path, flash_path);
+	if (buildPspemuMsfsPath(msfs_path_trunc, descriptor->path, flash_path, 0) < 0 ||
+	    (ADRENALINE_TEST_PROFILE && strlen(msfs_path_trunc) + sizeof("__TRUNC__") > sizeof(msfs_path_trunc))) {
+		return SCE_EINVAL;
+	}
 	strcat(msfs_path_trunc, "__TRUNC__");
 
 	fd = sceIoOpen(msfs_path_trunc, SCE_O_RDONLY, 0);
 	if (fd < 0) {
-		if (fd == SCE_ENOENT && flash_path == FLASH_DATA) {
+		if (canRetryInApp(fd, flash_path, 0)) {
 			flash_path = FLASH_APP;
 			memset(msfs_path_trunc, 0, MAX_PATH_LENGTH);
 			goto try_again;
@@ -450,7 +523,9 @@ static int ScePspemuMsfsRemove(const char *file) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, file, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, file, flash_path, 0) < 0) {
+		return SCE_EINVAL;
+	}
 
 	// Invalid path
 	if (file[0] == '\0') {
@@ -459,7 +534,7 @@ try_again:
 
 	int res = sceIoRemove(msfs_path);
 
-	if (res == SCE_ENOENT && flash_path == FLASH_DATA) {
+	if (canRetryInApp(res, flash_path, 0)) {
 		flash_path = FLASH_APP;
 		memset(msfs_path, 0, MAX_PATH_LENGTH);
 		goto try_again;
@@ -473,7 +548,9 @@ static int ScePspemuMsfsMkdir(const char *dir, SceMode mode) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, dir, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, dir, flash_path, 0) < 0) {
+		return SCE_EINVAL;
+	}
 
 	// Invalid path
 	if (dir[0] == '\0') {
@@ -482,7 +559,7 @@ try_again:
 
 	int res = sceIoMkdir(msfs_path, 0777);
 
-	if (res == SCE_ENOENT && flash_path == FLASH_DATA) {
+	if (canRetryInApp(res, flash_path, 0)) {
 		flash_path = FLASH_APP;
 		memset(msfs_path, 0, MAX_PATH_LENGTH);
 		goto try_again;
@@ -497,7 +574,9 @@ static int ScePspemuMsfsRmdir(const char *path) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, path, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, path, flash_path, 0) < 0) {
+		return SCE_EINVAL;
+	}
 
 	// Invalid path
 	if (path[0] == '\0') {
@@ -506,7 +585,7 @@ try_again:
 
 	int res = sceIoRmdir(msfs_path);
 
-	if (res == SCE_ENOENT && flash_path == FLASH_DATA) {
+	if (canRetryInApp(res, flash_path, 0)) {
 		flash_path = FLASH_APP;
 		memset(msfs_path, 0, MAX_PATH_LENGTH);
 		goto try_again;
@@ -520,11 +599,13 @@ static SceUID ScePspemuMsfsDopen(const char *dirname) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, dirname, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, dirname, flash_path, 1) < 0) {
+		return SCE_EINVAL;
+	}
 
 	SceUID dfd = sceIoDopen(msfs_path);
 	if (dfd < 0) {
-		if (dfd == SCE_ENOENT && flash_path == FLASH_DATA) {
+		if (canRetryInApp(dfd, flash_path, 1)) {
 			flash_path = FLASH_APP;
 			memset(msfs_path, 0, MAX_PATH_LENGTH);
 			goto try_again;
@@ -667,7 +748,9 @@ int ScePspemuMsfsGetstat(const char *file, SceIoStat *stat) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, file, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, file, flash_path, 1) < 0) {
+		return SCE_EINVAL;
+	}
 
 	// Invalid path
 	if (file[0] == '\0') {
@@ -676,7 +759,7 @@ try_again:
 
 	int res = sceIoGetstat(msfs_path, stat);
 
-	if (res == SCE_ENOENT && flash_path == FLASH_DATA) {
+	if (canRetryInApp(res, flash_path, 1)) {
 		flash_path = FLASH_APP;
 		memset(msfs_path, 0, MAX_PATH_LENGTH);
 		goto try_again;
@@ -692,7 +775,9 @@ static int ScePspemuMsfsChstat(const char *file, SceIoStat *stat, int bits) {
 	char msfs_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(msfs_path, file, flash_path);
+	if (buildPspemuMsfsPath(msfs_path, file, flash_path, 0) < 0) {
+		return SCE_EINVAL;
+	}
 
 	// Invalid path
 	if (file[0] == '\0') {
@@ -707,7 +792,7 @@ try_again:
 
 	int res = sceIoChstat(msfs_path, stat, bits);
 
-	if (res == SCE_ENOENT && flash_path == FLASH_DATA) {
+	if (canRetryInApp(res, flash_path, 0)) {
 		flash_path = FLASH_APP;
 		memset(msfs_path, 0, MAX_PATH_LENGTH);
 		goto try_again;
@@ -721,8 +806,10 @@ static int ScePspemuMsfsRename(const char *oldname, const char *newname) {
 	char old_path[MAX_PATH_LENGTH], new_path[MAX_PATH_LENGTH];
 
 try_again:
-	buildPspemuMsfsPath(old_path, oldname, flash_path);
-	buildPspemuMsfsPath(new_path, newname, flash_path);
+	if (buildPspemuMsfsPath(old_path, oldname, flash_path, 0) < 0 ||
+	    buildPspemuMsfsPath(new_path, newname, flash_path, 0) < 0) {
+		return SCE_EINVAL;
+	}
 
 	// Invalid path
 	if (oldname[0] == '\0' || newname[0] == '\0') {
@@ -737,13 +824,16 @@ try_again:
 		}
 
 		*p = '\0';
-		snprintf(new_path, sizeof(new_path), "%s/%s", old_path, newname);
+		int length = snprintf(new_path, sizeof(new_path), "%s/%s", old_path, newname);
 		*p = '/';
+		if (ADRENALINE_TEST_PROFILE && (length < 0 || length >= (int)sizeof(new_path))) {
+			return SCE_EINVAL;
+		}
 	}
 
 	int res = sceIoRename(old_path, new_path);
 
-	if (res == SCE_ENOENT && flash_path == FLASH_DATA) {
+	if (canRetryInApp(res, flash_path, 0)) {
 		flash_path = FLASH_APP;
 		memset(old_path, 0, MAX_PATH_LENGTH);
 		memset(new_path, 0, MAX_PATH_LENGTH);
@@ -767,6 +857,9 @@ static int ScePspemuMsfsDevctl(const char *dev, unsigned int cmd, void *indata, 
 
 		if (g_devctl_use_ef) {
 			g_devctl_use_ef = 0;
+		}
+		if (ADRENALINE_TEST_PROFILE && !path) {
+			return SCE_ENODEV;
 		}
 
 		int res = sceIoDevctl(path, 0x3001, NULL, 0, &devinfo, sizeof(SceIoDevInfo));

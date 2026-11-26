@@ -59,8 +59,13 @@ int WriteFile(char *file, void *buf, int size) {
 	}
 
 	int written = sceIoWrite(fd, buf, size);
-
+#ifdef CEF_TEST_RECOVERY
+	int closed = sceIoClose(fd);
+	if (written == size && closed < 0)
+		return closed;
+#else
 	sceIoClose(fd);
+#endif
 	return written;
 }
 

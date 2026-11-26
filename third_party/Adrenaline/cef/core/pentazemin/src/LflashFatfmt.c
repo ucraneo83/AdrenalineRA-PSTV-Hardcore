@@ -35,8 +35,12 @@ static int removePath(const char *path) {
 			if (res > 0) {
 				if (dir.d_name[0] != '.') {
 					char new_path[128];
-					sprintf(new_path, "%s/%s", path, dir.d_name);
-					removePath(new_path);
+					int length = snprintf(new_path, sizeof(new_path), "%s/%.*s", path,
+					                      (int)sizeof(dir.d_name), dir.d_name);
+					if (length < 0 || length >= (int)sizeof(new_path) || removePath(new_path) < 0) {
+						sceIoDclose(dfd);
+						return -1;
+					}
 				}
 			}
 		} while (res > 0);
@@ -59,7 +63,9 @@ int sceLflashFatfmtStartFatfmt(int argc, char *argv[]) {
 			char path[128];
 			sprintf(path, "ms0:/__ADRENALINE__/flash%d", num);
 
-			removePath(path);
+			int res = removePath(path);
+			if (res < 0)
+				return res;
 			sceIoMkdir(path, 0777);
 		}
 	}

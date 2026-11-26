@@ -344,7 +344,7 @@ static int AdrenalineCompat(SceSize args, void *argp) {
 			res = state.state | state.cable | state.connection | state.use_usb_charging;
 		} else if (request->cmd == ADRENALINE_VITA_CMD_START_USB) {
 			// Start usb
-			if (usbdevice_modid < 0 && !sceKernelIsPSVitaTV()) {
+			if (!ADRENALINE_TEST_PROFILE && usbdevice_modid < 0 && !sceKernelIsPSVitaTV()) {
 				char *path;
 
 				if (config.usbdevice == USBDEVICE_MODE_INTERNAL_STORAGE) {
@@ -472,7 +472,7 @@ static int AdrenalineCompat(SceSize args, void *argp) {
 			res = sceKernelPowerTick(*request->args);
 
 		} else if (request->cmd == ADRENALINE_VITA_CMD_IS_EF_ENABLED) {
-			if (config.ef_location == EF_LOCATION_DISABLED) {
+			if (ADRENALINE_TEST_PROFILE || config.ef_location == EF_LOCATION_DISABLED) {
 				res = 0;
 			} else if (strcmp(getPspemuEfLocation(), getPspemuMemoryStickLocation()) == 0) {
 				res = 0;
@@ -481,8 +481,12 @@ static int AdrenalineCompat(SceSize args, void *argp) {
 			}
 
 		} else if (request->cmd == ADRENALINE_VITA_CMD_EF_DEVINFO) {
-			g_devctl_use_ef = 1;
-			res = 0;
+			if (ADRENALINE_TEST_PROFILE) {
+				res = SCE_ENODEV;
+			} else {
+				g_devctl_use_ef = 1;
+				res = 0;
+			}
 		}
 
 		ScePspemuKermitSendResponse(KERMIT_MODE_EXTRA_2, request, (uint64_t)res);
@@ -677,9 +681,11 @@ static int sceCompatWaitSpecialRequestPatched(int mode) {
 	kuCtrlPeekBufferPositive(0, &pad, 1);
 
 	SceIoStat stat;
+#if !ADRENALINE_TEST_PROFILE
 	char ark_path[64];
 	snprintf(ark_path, sizeof(ark_path), "%s" FLASH0_ARK_PATH, getPspemuMemoryStickLocation());
 	allow_ark = sceIoGetstat(ark_path, &stat) >= 0 || sceIoGetstat("ux0:pspemu" FLASH0_ARK_PATH, &stat) >= 0;
+#endif
 
 	if (pad.buttons & SCE_CTRL_RTRIGGER) {
 		((uint32_t *)n)[0] = MODE_RECOVERY; // Recovery mode
@@ -793,6 +799,7 @@ static void migrate_config() {
 	}
 }
 
+int sceAVConfigGetMasterVol(int *vol);
 int sceAVConfigSetMasterVol(int vol);
 
 /* SceHttps cannot be started reliably after a PSP game has entered the
@@ -896,7 +903,34 @@ static void ra_mirror_policy(const char *stage)
 
 void _start() __attribute__ ((weak, alias("module_start")));
 int module_start(SceSize args, void *argp) {
+	if (ADRENALINE_TEST_PROFILE && !ADRENALINE_TEST_REPLACEMENT) {
+		return SCE_KERNEL_START_FAILED;
+	}
+
+	int vol = adrStopBlanking();
+	if (vol > 0) {
+		int current_volume;
+		if (sceAVConfigGetMasterVol(&current_volume) >= 0) {
+			sceAVConfigSetMasterVol(vol);
+		} else {
+			sceAVConfigSetSystemVol(vol);
+		}
+	}
+
 	int res;
+
+#if ADRENALINE_TEST_PROFILE
+	SceIoStat storage_stat;
+	res = sceIoGetstat(ADRENALINE_TEST_MS_ROOT, &storage_stat);
+	if (res == SCE_ENOENT) {
+		sceIoMkdir(ADRENALINE_TEST_DATA_ROOT, 0777);
+		sceIoMkdir(ADRENALINE_TEST_MS_ROOT, 0777);
+		res = sceIoGetstat(ADRENALINE_TEST_MS_ROOT, &storage_stat);
+	}
+	if (res < 0 || !SCE_S_ISDIR(storage_stat.st_mode)) {
+		return SCE_KERNEL_START_FAILED;
+	}
+#endif
 
 	ra_settings_load_for_logging();
 	ra_log_begin_session(0);
@@ -968,14 +1002,6 @@ int module_start(SceSize args, void *argp) {
 	if ((uint32_t)config.ps1_screen_scale_y == 0) {
 		config.ps1_screen_scale_y = 1.0f;
 	}
-
-	int vol = adrStopBlanking();
-	if (vol > 0) {
-		if(sceAVConfigSetMasterVol(vol) < 0) {
-			sceAVConfigSetSystemVol(vol);
-		}
-	}
-
 
 	// Tai module info
 	tai_module_info_t tai_info;
@@ -1496,6 +1522,10 @@ int module_start(SceSize args, void *argp) {
 }
 
 int module_stop(SceSize args, void *argp) {
+	if (ADRENALINE_TEST_PROFILE && !ADRENALINE_TEST_REPLACEMENT) {
+		return SCE_KERNEL_STOP_SUCCESS;
+	}
+
 	/* Before the hooks go: a callback left in the power service would run after
 	 * this module is gone (docs/45). */
 	ra_runtime_release_power_hook();

@@ -1,4 +1,5 @@
 #include "ra_server.h"
+#include "adrenaline_identity.h"
 #include "ra_server_json.h"
 #include "ra_server_util.h"
 #include "ra_server_payload.h"
@@ -46,7 +47,7 @@ unsigned int ra_server_get_payload_set(void) { return g_payload_set; }
  * directory, a busy file or an unwritable card must never fail a load. */
 void ra_server_purge_caches(void) {
 #ifdef __vita__
-  static const char k_dir[] = "ux0:data/AdrenalineRA/sets";
+  static const char k_dir[] = RA_DATA_ROOT_UX0 "/sets";
   SceUID dir;
   SceIoDirent entry;
 
@@ -67,7 +68,7 @@ void ra_server_purge_caches(void) {
   }
   sceIoRmdir(k_dir);
   /* The hash cache is one file; hashes are recomputed every launch now. */
-  sceIoRemove("ux0:data/AdrenalineRA/hash_cache");
+  sceIoRemove(RA_DATA_ROOT_UX0 "/hash_cache");
 #endif
 }
 

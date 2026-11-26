@@ -30,4 +30,8 @@ add_cef_prx(recovery USER
     -Wno-incompatible-pointer-types
 )
 
+if(CEF_TEST_RECOVERY)
+  target_compile_definitions(recovery PRIVATE CEF_TEST_RECOVERY=1)
+endif()
+
 copy_prx_flash0(recovery Recovery USER)

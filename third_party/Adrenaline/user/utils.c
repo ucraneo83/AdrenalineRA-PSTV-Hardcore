@@ -306,7 +306,67 @@ void SetPspemuFrameBuffer(void *base) {
 	sceDisplaySetFrameBuf(&framebuf, SCE_DISPLAY_SETBUF_NEXTFRAME);
 }
 
+#if ADRENALINE_TEST_PROFILE
+int isTestPspRelativePath(const char *path) {
+	if (!path || !memchr(path, '\0', MAX_PATH_LENGTH) || strpbrk(path, ":\\")) {
+		return 0;
+	}
+
+	// Reject traversal and spellings that FAT can normalize to a different name.
+	while (*path) {
+		size_t length = strcspn(path, "/");
+		if (length && (path[length - 1] == '.' || path[length - 1] == ' ')) {
+			return 0;
+		}
+		path += length;
+		if (*path == '/') {
+			path++;
+		}
+	}
+	return 1;
+}
+
+int isTestReadOnlyOpen(int flags) {
+	const int read_flags = SCE_O_RDONLY | SCE_O_NBLOCK | SCE_O_RDLOCK |
+		SCE_O_NOBUF | SCE_O_NOWAIT | SCE_O_FDEXCL | SCE_O_PWLOCK;
+	return (flags & SCE_O_RDONLY) != 0 && (flags & ~read_flags) == 0;
+}
+
+void logTestPathError(const char *operation, const char *path, int flags, int result) {
+	static unsigned int errors;
+	if (__atomic_fetch_add(&errors, 1, __ATOMIC_RELAXED) >= 48) {
+		return;
+	}
+
+	char line[256];
+	int length = snprintf(line, sizeof(line), "%s flags=0x%08X result=0x%08X path=%.140s\n",
+		operation, (unsigned int)flags, (unsigned int)result, path ? path : "(null)");
+	if (length <= 0 || length >= (int)sizeof(line)) {
+		return;
+	}
+	SceUID fd = sceIoOpen(ADRENALINE_TEST_DATA_ROOT "/psp-io.txt",
+		SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0777);
+	if (fd >= 0) {
+		sceIoWrite(fd, line, length);
+		sceIoClose(fd);
+	}
+}
+
+const char *getTestIsoSuffix(const char *path) {
+	while (*path == '/') {
+		path++;
+	}
+	if (strncasecmp(path, "ISO", 3) == 0 && (path[3] == '/' || path[3] == '\0')) {
+		return path + 3;
+	}
+	return NULL;
+}
+#endif
+
 char *getPspemuMemoryStickLocation(void) {
+#if ADRENALINE_TEST_PROFILE
+	return ADRENALINE_TEST_MS_ROOT;
+#else
 	switch (config.ms_location) {
 		case MEMORY_STICK_LOCATION_UR0:
 			return "ur0:pspemu";
@@ -321,9 +381,13 @@ char *getPspemuMemoryStickLocation(void) {
 		default:
 			return "ux0:pspemu";
 	}
+#endif
 }
 
 char *getPspemuEfLocation(void) {
+#if ADRENALINE_TEST_PROFILE
+	return NULL;
+#else
 	switch (config.ef_location) {
 		case EF_LOCATION_UMA0:
 			return "uma0:pspemu";
@@ -336,9 +400,13 @@ char *getPspemuEfLocation(void) {
 		default:
 			return NULL;
 	}
+#endif
 }
 
 char *getPspemuMemoryStickDevice(void) {
+#if ADRENALINE_TEST_PROFILE
+	return "ux0:";
+#else
 	switch (config.ms_location) {
 		case MEMORY_STICK_LOCATION_UR0:
 			return "ur0:";
@@ -353,9 +421,13 @@ char *getPspemuMemoryStickDevice(void) {
 		default:
 			return "ux0:";
 	}
+#endif
 }
 
 char *getPspemuEfDevice(void) {
+#if ADRENALINE_TEST_PROFILE
+	return NULL;
+#else
 	switch (config.ef_location) {
 		case EF_LOCATION_UX0:
 			return "ux0:";
@@ -367,6 +439,7 @@ char *getPspemuEfDevice(void) {
 		default:
 			return NULL;
 	}
+#endif
 }
 
 #define THUMB_SHUFFLE(x) ((((x) & 0xFFFF0000) >> 16) | (((x) & 0xFFFF) << 16))

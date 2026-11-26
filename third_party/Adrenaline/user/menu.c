@@ -133,10 +133,12 @@ static char *graphics_options[] = { "Original", "Bilinear", "Sharp bilinear", "A
 static char *flux_mode_options[] = { "None", "Yellow", "Blue", "Black" };
 static char *no_yes_options[] = { "No", "Yes" };
 static char *yes_no_options[] = { "Yes", "No" };
+#if !ADRENALINE_TEST_PROFILE
 static char *ms_location_options[] = { "ux0:pspemu", "ur0:pspemu", "imc0:pspemu", "xmc0:pspemu", "uma0:pspemu", "uma0:" };
 static char *usbdevice_options[] = { "Memory Card", "Internal Storage", "sd2vita", "psvsd" };
 static char *cfwtype_options[] = { "Epinephrine (EPI)", "ARK" };
 static char *ef_location_options[] = { "Disabled", "uma0:pspemu", "xmc0:pspemu", "ux0:pspemu", "uma0:" };
+#endif
 
 static MenuEntry main_entries[] = {
 	{ "Enter Standby Mode",        MENU_ENTRY_TYPE_CALLBACK, WHITE, EnterStandbyMode, NULL, NULL, 0 },
@@ -146,8 +148,10 @@ static MenuEntry main_entries[] = {
 };
 
 static MenuEntry settings_entries[] = {
+#if !ADRENALINE_TEST_PROFILE
 	{ "vPSP Custom Firmware",      MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.cfw_type, cfwtype_options, sizeof(cfwtype_options)/sizeof(char*) },
 	{ "", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
+#endif
 	{ "Graphics Filtering",        MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.graphics_filtering, graphics_options, sizeof(graphics_options) / sizeof(char **) },
 	{ "Smooth Graphics",           MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.no_smooth_graphics, yes_no_options, sizeof(yes_no_options) / sizeof(char **) },
 	{ "f.lux Filter Color",        MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.flux_mode, flux_mode_options, sizeof(flux_mode_options) / sizeof(char **) },
@@ -156,9 +160,11 @@ static MenuEntry settings_entries[] = {
 	{ "Screen Scale X (PS1)",      MENU_ENTRY_TYPE_SCALE,  0, NULL, (uint8_t *)&config.ps1_screen_scale_x, NULL, 0 },
 	{ "Screen Scale Y (PS1)",      MENU_ENTRY_TYPE_SCALE,  0, NULL, (uint8_t *)&config.ps1_screen_scale_y, NULL, 0 },
 	{ "", MENU_ENTRY_TYPE_TEXT, WHITE, NULL, NULL, NULL, 0 },
+#if !ADRENALINE_TEST_PROFILE
 	{ "Memory Stick Location",     MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.ms_location, ms_location_options, sizeof(ms_location_options) / sizeof(char **) },
 	{ "System Storage Location",   MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.ef_location, ef_location_options, sizeof(ef_location_options) / sizeof(char **) },
 	{ "USB device",                MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.usbdevice, usbdevice_options, sizeof(usbdevice_options) / sizeof(char **) },
+#endif
 	{ "Skip Adrenaline Boot Logo", MENU_ENTRY_TYPE_OPTION, 0, NULL, &config.skip_logo, no_yes_options, sizeof(no_yes_options) / sizeof(char **) },
 	{ "Reset Adrenaline Settings", MENU_ENTRY_TYPE_CALLBACK, YELLOW, ResetAdrenalineSettings, NULL, NULL, 0 },
 };
@@ -572,6 +578,7 @@ static int EnterAdrenalineMenu() {
 		ra_menu_log_sync("menu: open: world pause claimed\n");
 	}
 
+#if !ADRENALINE_TEST_PROFILE
 	// Check if ARK is installed
 	SceIoStat stat;
 	char ark_path[64];
@@ -582,6 +589,7 @@ static int EnterAdrenalineMenu() {
 	} else {
 		settings_entries[0].n_options = sizeof(cfwtype_options)/sizeof(char*);
 	}
+#endif
 
 	return 0;
 }

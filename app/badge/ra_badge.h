@@ -2,6 +2,7 @@
 #define RA_BADGE_H
 
 #include <stddef.h>
+#include "adrenaline_identity.h"
 #include <stdint.h>
 
 #include <vita2d.h>
@@ -14,7 +15,7 @@ extern "C" {
 
 #define RA_BADGE_URL_MAX 192
 /* Badge cache directory; keys carry a `_lock` suffix for locked art. */
-#define RA_BADGE_DIR "ux0:data/AdrenalineRA/badges"
+#define RA_BADGE_DIR RA_DATA_ROOT_UX0 "/badges"
 
 /* Starts the low-priority badge downloader and its cache. Idempotent. */
 void ra_badge_init(void);

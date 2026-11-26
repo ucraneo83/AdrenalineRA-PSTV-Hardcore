@@ -1,4 +1,5 @@
 #include "ra_sound.h"
+#include "adrenaline_identity.h"
 
 #include <psp2/audioout.h>
 #include <psp2/io/fcntl.h>
@@ -119,14 +120,14 @@ static int load_for_kind(int kind, int choice, int16_t **samples,
   const char *name = sound_name(kind);
 
   if (choice == 2) {
-    snprintf(path, sizeof(path), "ux0:data/AdrenalineRA/sounds/%s.wav", name);
+    snprintf(path, sizeof(path), RA_DATA_ROOT_UX0 "/sounds/%s.wav", name);
     if (load_sound(path, samples, count)) {
       sound_log("sound: override loaded\n");
       return 1;
     }
     sound_log("sound: override missing; using built-in\n");
   }
-  snprintf(path, sizeof(path), "ux0:app/PSPEMUCFW/ra_sounds/%s.wav", name);
+  snprintf(path, sizeof(path), "ux0:app/" ADRENALINE_TITLEID "/ra_sounds/%s.wav", name);
   if (load_sound(path, samples, count))
     return 1;
   snprintf(path, sizeof(path), "app0:ra_sounds/%s.wav", name);

@@ -28,6 +28,7 @@ add_cef_prx(systemctrl
     microlz
   LINK_STUBS
     adrenalinectrl
+    psprtc
     pspsemaphore
     pspinit_kernel
     pspstdio_kernel
@@ -46,7 +47,10 @@ add_cef_prx(systemctrl
     pspinterruptmanager_kernel
 )
 
-target_include_directories(systemctrl PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(systemctrl PRIVATE
+  "${CMAKE_CURRENT_BINARY_DIR}"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../core/server"
+)
 
 add_custom_command(OUTPUT rebootex.h
   DEPENDS rebootex

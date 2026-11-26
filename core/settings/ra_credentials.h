@@ -2,13 +2,14 @@
 #define RA_CREDENTIALS_H
 
 #include <stddef.h>
+#include "adrenaline_identity.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define RA_CREDENTIALS_UR0 "ur0:data/AdrenalineRA/ra.cfg"
-#define RA_CREDENTIALS_UX0 "ux0:data/AdrenalineRA/ra.cfg"
+#define RA_CREDENTIALS_UR0 RA_DATA_ROOT_UR0 "/ra.cfg"
+#define RA_CREDENTIALS_UX0 RA_DATA_ROOT_UX0 "/ra.cfg"
 
 int ra_credentials_exists(void);
 int ra_credentials_load(char *username, size_t username_capacity,

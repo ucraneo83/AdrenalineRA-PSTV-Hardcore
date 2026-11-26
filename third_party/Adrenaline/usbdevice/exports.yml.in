@@ -1,4 +1,4 @@
-VitaShellUsbDevice:
+VitaShellUsbDevice@ADRENALINE_MODULE_SUFFIX@:
   attributes: 0
   version:
     major: 1

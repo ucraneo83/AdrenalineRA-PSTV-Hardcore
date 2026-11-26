@@ -27,7 +27,7 @@ set_target_properties(adrenaline_vsh PROPERTIES
 target_link_directories(adrenaline_vsh PRIVATE ${CMAKE_BINARY_DIR}/kernel)
 
 target_link_libraries(adrenaline_vsh
-  AdrenalineKernel_stub
+  AdrenalineKernel${ADRENALINE_MODULE_SUFFIX}_stub
   taihen_stub
   SceLibKernel_stub
   SceAppMgr_stub
@@ -37,9 +37,8 @@ target_link_libraries(adrenaline_vsh
   SceAVConfig_stub
 )
 
-vita_create_self(adrenaline_vsh.suprx adrenaline_vsh CONFIG exports.yml UNSAFE)
-
-#vita_create_stubs(vstubs adrenaline_vsh ${CMAKE_CURRENT_SOURCE_DIR}/exports.yml)
+vita_create_self(adrenaline_vsh.suprx adrenaline_vsh
+  CONFIG "${ADRENALINE_IDENTITY_INCLUDE_DIR}/vsh-exports.yml" UNSAFE)
 
 #add_custom_target(copy
 #  COMMAND cp adrenaline_vsh.suprx F:/app/PSPEMUCFW/sce_module/adrenaline_vsh.suprx

@@ -2,14 +2,15 @@
 #define RA_OFFLINE_H
 
 #include <stddef.h>
+#include "adrenaline_identity.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Crash-safe queue for submissions that never reached the server. */
-#define RA_OFFLINE_PATH_UR0 "ur0:data/AdrenalineRA/pending.dat"
-#define RA_OFFLINE_PATH_UX0 "ux0:data/AdrenalineRA/pending.dat"
+#define RA_OFFLINE_PATH_UR0 RA_DATA_ROOT_UR0 "/pending.dat"
+#define RA_OFFLINE_PATH_UX0 RA_DATA_ROOT_UX0 "/pending.dat"
 #define RA_OFFLINE_MAX_ENTRIES 8
 /* Gap between replayed records, in ms. RA timestamps an award with the server's clock, so
  * records posted in one burst share a timestamp and lose their order. */

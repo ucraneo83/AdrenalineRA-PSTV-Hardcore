@@ -34,23 +34,31 @@
 #include "menu.h"
 #include "utils.h"
 #include "files.h"
+#include "psperror.h"
 #include <systemctrl_epi.h>
 
 #define BIG_BUFFER_SIZE 8 * 1024 * 1024
 #define SMALL_BUFFER_SIZE 2 * 1024 * 1024
 
+#define FLASH0_LIVE "ms0:/__ADRENALINE__/flash0"
+#ifdef CEF_TEST_RECOVERY
+#define FLASH0_EXTRACT FLASH0_LIVE ".installing"
+#else
+#define FLASH0_EXTRACT FLASH0_LIVE
+#endif
+
 static char *g_flash0_dirs[] = {
-	"ms0:/__ADRENALINE__/flash0/codepage",
-	"ms0:/__ADRENALINE__/flash0/data",
-	"ms0:/__ADRENALINE__/flash0/dic",
-	"ms0:/__ADRENALINE__/flash0/font",
-	"ms0:/__ADRENALINE__/flash0/kd",
-	"ms0:/__ADRENALINE__/flash0/vsh",
-	"ms0:/__ADRENALINE__/flash0/data/cert",
-	"ms0:/__ADRENALINE__/flash0/kd/resource",
-	"ms0:/__ADRENALINE__/flash0/vsh/etc",
-	"ms0:/__ADRENALINE__/flash0/vsh/module",
-	"ms0:/__ADRENALINE__/flash0/vsh/resource",
+	FLASH0_EXTRACT "/codepage",
+	FLASH0_EXTRACT "/data",
+	FLASH0_EXTRACT "/dic",
+	FLASH0_EXTRACT "/font",
+	FLASH0_EXTRACT "/kd",
+	FLASH0_EXTRACT "/vsh",
+	FLASH0_EXTRACT "/data/cert",
+	FLASH0_EXTRACT "/kd/resource",
+	FLASH0_EXTRACT "/vsh/etc",
+	FLASH0_EXTRACT "/vsh/module",
+	FLASH0_EXTRACT "/vsh/resource",
 };
 
 static char *g_flash1_dirs[] = {
@@ -94,13 +102,40 @@ static int FindTablePath(char *table, int table_size, char *number, char *szOut)
 	return 0;
 }
 
-static char *GetVersion(char *buf) {
-	char *p = strrchr(buf, ',');
-	if (!p) {
-		return NULL;
+static const char *GetVersion(const char *buf, size_t capacity) {
+	const char *version = NULL;
+	for (size_t i = 0; i < capacity; i++) {
+		if (buf[i] == '\0') {
+			return version && buf + i - version >= 4 ? version : NULL;
+		}
+		if (buf[i] == ',') {
+			version = buf + i + 1;
+		}
+	}
+	return NULL;
+}
+
+static int LoadFirmwarePsar(SceUID fd, u8 *buffer) {
+	int file_size = sceIoLseek32(fd, 0, PSP_SEEK_END);
+	PBPHeader header;
+	if (file_size < (int)sizeof(header) || sceIoLseek32(fd, 0, PSP_SEEK_SET) != 0 ||
+	    sceIoRead(fd, &header, sizeof(header)) != sizeof(header) ||
+	    memcmp(&header.magic, "\0PBP", 4) != 0 ||
+	    header.psar_offset < sizeof(header) || header.psar_offset > (u32)file_size) {
+		return -1;
 	}
 
-	return p + 1;
+	int size = file_size - (int)header.psar_offset;
+	if (size < 16 || sceIoLseek32(fd, header.psar_offset, PSP_SEEK_SET) != (int)header.psar_offset) {
+		return -1;
+	}
+
+	int count = size < BIG_BUFFER_SIZE ? size : BIG_BUFFER_SIZE;
+	if (sceIoRead(fd, buffer, count) != count || memcmp(buffer, "PSAR", 4) != 0) {
+		return -1;
+	}
+	memset(buffer + count, 0, BIG_BUFFER_SIZE - count);
+	return size;
 }
 
 static int is5Dnum(char *str) {
@@ -132,7 +167,31 @@ static void DrawProgress(int progress) {
 }
 
 
+#ifdef CEF_TEST_RECOVERY
+static int RequireNewFlash0(void) {
+	SceIoStat stat;
+	int res = sceIoGetstat(FLASH0_LIVE, &stat);
+	return res == SCE_ENOENT ? 0 : res < 0 ? res : SCE_EEXIST;
+}
+
+static int PublishStagedFlash0(int files_written) {
+	if (files_written != N_FILES) {
+		return SCE_EINVAL;
+	}
+	int res = RequireNewFlash0();
+	if (res < 0) {
+		return res;
+	}
+	return sceIoRename(FLASH0_EXTRACT, FLASH0_LIVE);
+}
+#endif
+
 void Installer() {
+#ifdef CEF_TEST_RECOVERY
+	u8 written[N_FILES] = {0};
+	int stage_created = 0;
+#endif
+	SceUID fd = -1;
 	u32 size_written = 0;
 	int res = 0;
 	int error = 0;
@@ -195,32 +254,29 @@ void Installer() {
 	VGraphGoto(2, 5);
 	VGraphPrintf("Loading 661.PBP... ");
 
+	if (!sm_buffer1 || !sm_buffer2 || !big_buffer) {
+		VGraphGoto(2, 24);
+		VGraphSetTextColor(0x4, 0x0);
+		VGraphPrintf("Not enough memory to read PSP firmware.");
+		goto EXIT;
+	}
+
 	// Open file
-	SceUID fd = sceIoOpen("ms0:/__ADRENALINE__/661.PBP", PSP_O_RDONLY, 0);
+	const char *firmware_path = "ms0:/__ADRENALINE__/661.PBP";
+	fd = sceIoOpen(firmware_path, PSP_O_RDONLY, 0);
 	if (fd < 0) {
 		VGraphGoto(2, 24);
 		// TODO:show error dialog
 		VGraphSetTextColor(0x4, 0x0);
-		VGraphPrintf("Cannot find ux0:data/" ADRENALINE_TITLEID "/661.PBP or ux0:app/" ADRENALINE_TITLEID "/661.PBP.");
+		VGraphPrintf("Cannot open PSP firmware at %s.", firmware_path);
 		goto EXIT;
 	}
 
-	int size = sceIoLseek32(fd, 0, PSP_SEEK_END);
-	sceIoLseek32(fd, 0, PSP_SEEK_SET);
-
-	// Read file
-	PBPHeader pbp_header;
-	sceIoRead(fd, &pbp_header, sizeof(PBPHeader));
-	sceIoLseek32(fd, pbp_header.psar_offset, PSP_SEEK_SET);
-
-	size = size - pbp_header.psar_offset;
-
-	res = sceIoRead(fd, big_buffer, BIG_BUFFER_SIZE);
-	if (res <= 0) {
-		// TODO:show error dialog
+	int size = LoadFirmwarePsar(fd, big_buffer);
+	if (size < 0) {
 		VGraphGoto(2, 24);
 		VGraphSetTextColor(0x4, 0x0);
-		VGraphPrintf("Error reading 661.PBP (0x%08X).", res);
+		VGraphPrintf("Invalid or incomplete 661.PBP.");
 		goto EXIT;
 	}
 
@@ -230,6 +286,7 @@ void Installer() {
 
 	int psarVersion = big_buffer[4];
 
+	memset(sm_buffer1, 0, SMALL_BUFFER_SIZE);
 	res = pspPSARInit(big_buffer, sm_buffer1, sm_buffer2);
 	if (res < 0) {
 		VGraphGoto(2, 24);
@@ -238,8 +295,8 @@ void Installer() {
 		goto EXIT;
 	}
 
-	char *version = GetVersion((char *)sm_buffer1 + 0x10);
-	if ((memcmp(version, "6.61", 4) != 0)) {
+	const char *version = GetVersion((const char *)sm_buffer1 + 0x10, SMALL_BUFFER_SIZE - 0x10);
+	if (!version || memcmp(version, "6.61", 4) != 0) {
 		VGraphGoto(2, 24);
 		VGraphSetTextColor(0x4, 0x0);
 		VGraphPrintf("Please obtain the correct EBOOT.PBP for 6.61.");
@@ -255,15 +312,30 @@ void Installer() {
 		goto EXIT;
 	}
 
-	// Uninstall
-	removePath("ms0:/__ADRENALINE__/flash0");
-	removePath("ms0:/__ADRENALINE__/flash1");
-
 	VGraphGoto(2, 6);
 	VGraphPrintf("Creating directories... ");
 
-	// Create directories
-	sceIoMkdir("ms0:/__ADRENALINE__/flash0", 0777);
+#ifdef CEF_TEST_RECOVERY
+	res = RequireNewFlash0();
+	if (res < 0) {
+		VGraphGoto(2, 24);
+		VGraphSetTextColor(0x4, 0x0);
+		VGraphPrintf("Test requires a new flash0 directory (0x%08X).", res);
+		goto EXIT;
+	}
+	res = sceIoMkdir(FLASH0_EXTRACT, 0777);
+	if (res < 0) {
+		VGraphGoto(2, 24);
+		VGraphSetTextColor(0x4, 0x0);
+		VGraphPrintf("Cannot create Test staging directory (0x%08X).", res);
+		goto EXIT;
+	}
+	stage_created = 1;
+#else
+	removePath(FLASH0_LIVE);
+	removePath("ms0:/__ADRENALINE__/flash1");
+	sceIoMkdir(FLASH0_LIVE, 0777);
+#endif
 	sceIoMkdir("ms0:/__ADRENALINE__/flash1", 0777);
 	sceIoMkdir("ms0:/__ADRENALINE__/flash2", 0777);
 	sceIoMkdir("ms0:/__ADRENALINE__/flash3", 0777);
@@ -365,7 +437,7 @@ void Installer() {
 								for (int i = 0; i < N_FILES; i++) {
 									if (strcmp(name + 7, g_files[i]) == 0) {
 										char path[256];
-										sprintf(path, "ms0:/__ADRENALINE__/flash0/%s", name + 8);
+										sprintf(path, FLASH0_EXTRACT "/%s", name + 8);
 										res = WriteFile(path, sm_buffer2, cbExpanded);
 										if (res != cbExpanded) {
 											VGraphGoto(2, 24);
@@ -373,7 +445,12 @@ void Installer() {
 											VGraphPrintf("Error writing file (0x%08X).", res);
 											goto EXIT;
 										}
+#ifdef CEF_TEST_RECOVERY
+										progress += !written[i];
+										written[i] = 1;
+#else
 										progress++;
+#endif
 										DrawProgress(progress);
 									}
 								}
@@ -392,6 +469,17 @@ void Installer() {
 
 		error = 0;
 	}
+
+#ifdef CEF_TEST_RECOVERY
+	res = PublishStagedFlash0(progress);
+	if (res < 0) {
+		VGraphGoto(2, 24);
+		VGraphSetTextColor(0x4, 0x0);
+		VGraphPrintf("Cannot publish Test flash0 (0x%08X).", res);
+		goto EXIT;
+	}
+	stage_created = 0;
+#endif
 
 	VGraphGoto(8, 15);
 	VGraphSetTextColor(0x2, 0x0);
@@ -416,7 +504,12 @@ void Installer() {
 	sctrlKernelExitVSH(NULL);
 
 EXIT:
-	sceIoClose(fd);
+#ifdef CEF_TEST_RECOVERY
+	if (stage_created)
+		removePath(FLASH0_EXTRACT);
+#endif
+	if (fd >= 0)
+		sceIoClose(fd);
 
 	free(sm_buffer1);
 	free(sm_buffer2);

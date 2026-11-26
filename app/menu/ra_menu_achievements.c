@@ -1,4 +1,5 @@
 #include "ra_menu_achievements.h"
+#include "adrenaline_identity.h"
 #include "ra_menu_entries.h"
 #include "ra_menu_rows.h"
 #include "ra_menu_internal.h"
@@ -73,8 +74,8 @@ static void achievement_ui_path(char *path, size_t capacity) {
   safe[j] = '\0';
   if (safe[0] == '\0')
     ra_menu_copy_text(safe, sizeof(safe), "XMB");
-  sceIoMkdir("ux0:data/AdrenalineRA/ui", 0777);
-  snprintf(path, capacity, "ux0:data/AdrenalineRA/ui/%s.cfg", safe);
+  sceIoMkdir(RA_DATA_ROOT_UX0 "/ui", 0777);
+  snprintf(path, capacity, RA_DATA_ROOT_UX0 "/ui/%s.cfg", safe);
 }
 
 static void achievement_ui_defaults(void) {

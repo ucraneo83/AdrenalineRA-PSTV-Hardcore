@@ -81,13 +81,15 @@ set_property(TARGET vitashadercollection_libA
 FUNCTION(ADD_RESOURCES out_var)
   SET(result)
   FOREACH(in_f ${ARGN})
-  SET(out_f "${CMAKE_CURRENT_BINARY_DIR}/${in_f}.o")
+  SET(out_f "${CMAKE_CURRENT_BINARY_DIR}/flash0/${in_f}.o")
   GET_FILENAME_COMPONENT(out_dir ${out_f} DIRECTORY)
   ADD_CUSTOM_COMMAND(OUTPUT ${out_f}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${out_dir}
-    COMMAND ${CMAKE_LINKER} -r -b binary -o ${out_f} ${in_f}
-    DEPENDS ${in_f}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${ADRENALINE_FLASH0_DIR}/${in_f}" "${CMAKE_CURRENT_BINARY_DIR}/flash0/${in_f}"
+    COMMAND ${CMAKE_LINKER} -r -b binary -o "${out_f}" "flash0/${in_f}"
+    DEPENDS "${ADRENALINE_FLASH0_DIR}/${in_f}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     COMMENT "Building resource ${out_f}"
     VERBATIM
     )
@@ -96,14 +98,7 @@ FUNCTION(ADD_RESOURCES out_var)
   SET(${out_var} "${result}" PARENT_SCOPE)
 ENDFUNCTION()
 
-file(GLOB res_files RELATIVE
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  flash0/kd/*.prx
-  flash0/kd/*.bin
-  flash0/vsh/module/*.prx
-  flash0/*.bin
-)
-add_resources(cef_res ${res_files})
+add_resources(cef_res ${ADRENALINE_FLASH0_RESOURCES})
 
 add_executable(adrenaline_user
   ${cef_res}
@@ -256,7 +251,7 @@ target_link_libraries(adrenaline_user
   -Wl,--wrap=calloc
   -Wl,--wrap=realloc
   -Wl,--wrap=free
-  AdrenalineKernel_stub
+  AdrenalineKernel${ADRENALINE_MODULE_SUFFIX}_stub
   taihen_stub
   rcheevos
   m
@@ -300,9 +295,8 @@ target_link_libraries(adrenaline_user
   SceAVConfig_stub
 )
 
-vita_create_self(adrenaline_user.suprx adrenaline_user CONFIG exports.yml UNSAFE)
-
-#vita_create_stubs(ustubs adrenaline_user ${CMAKE_CURRENT_SOURCE_DIR}/exports.yml)
+vita_create_self(adrenaline_user.suprx adrenaline_user
+  CONFIG "${ADRENALINE_IDENTITY_INCLUDE_DIR}/user-exports.yml" UNSAFE)
 
 #add_custom_target(copy
 #  COMMAND cp adrenaline_user.suprx F:/app/PSPEMUCFW/sce_module/adrenaline_user.suprx

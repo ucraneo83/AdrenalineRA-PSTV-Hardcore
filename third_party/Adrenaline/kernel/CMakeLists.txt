@@ -41,9 +41,10 @@ target_link_libraries(adrenaline_kernel
   SceDebugForDriver_stub
 )
 
-vita_create_self(adrenaline_kernel.skprx adrenaline_kernel CONFIG exports.yml UNSAFE)
+set(KERNEL_EXPORTS "${ADRENALINE_IDENTITY_INCLUDE_DIR}/kernel-exports.yml")
+vita_create_self(adrenaline_kernel.skprx adrenaline_kernel CONFIG "${KERNEL_EXPORTS}" UNSAFE)
 
-vita_create_stubs(kstubs adrenaline_kernel ${CMAKE_CURRENT_SOURCE_DIR}/exports.yml KERNEL)
+vita_create_stubs(kstubs adrenaline_kernel "${KERNEL_EXPORTS}" KERNEL)
 
 #install(DIRECTORY ${CMAKE_BINARY_DIR}/stubs/
 #  DESTINATION lib
@@ -69,6 +70,6 @@ vita_create_stubs(kstubs adrenaline_kernel ${CMAKE_CURRENT_SOURCE_DIR}/exports.y
 add_custom_target(kernel_all
   ALL
   DEPENDS adrenaline_kernel.skprx-self
-  DEPENDS libAdrenalineKernel_stub.a
-  DEPENDS libAdrenalineKernel_stub_weak.a
+  DEPENDS libAdrenalineKernel${ADRENALINE_MODULE_SUFFIX}_stub.a
+  DEPENDS libAdrenalineKernel${ADRENALINE_MODULE_SUFFIX}_stub_weak.a
 )

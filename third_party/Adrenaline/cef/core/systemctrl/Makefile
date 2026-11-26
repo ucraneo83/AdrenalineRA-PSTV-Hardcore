@@ -24,7 +24,7 @@ OBJS =  src/main.o \
 	../../bits/ttystdio.o \
 	exports.o
 
-INCDIR = ../../include include ../../../../../shared
+INCDIR = ../../include include ../../../../../core/server
 CFLAGS = -Os -G0 -Wall -Wno-builtin-declaration-mismatch -fshort-wchar -fno-pic -mno-check-zero-division
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)

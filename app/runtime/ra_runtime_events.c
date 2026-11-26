@@ -505,7 +505,7 @@ void ra_runtime_status(int result, const char *error_message, void *userdata) {
       /* An unknown hash is terminal. Retrying cannot make the game
              * appear in the database and produced the Signing/Inactive loop. */
       ra_runtime_mark_game_unsupported();
-      ra_runtime_fail("RetroAchievements does not support this game");
+      ra_runtime_fail("RetroAchievements did not recognize this game file");
       return;
     }
     ra_runtime_log("runtime: load failed result=%d message='%s'\n", result,

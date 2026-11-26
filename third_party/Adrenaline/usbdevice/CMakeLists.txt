@@ -31,7 +31,8 @@ target_link_libraries(usbdevice
   taihenForKernel_stub
 )
 
-vita_create_self(usbdevice.skprx usbdevice CONFIG exports.yml UNSAFE)
+vita_create_self(usbdevice.skprx usbdevice
+  CONFIG "${ADRENALINE_IDENTITY_INCLUDE_DIR}/usbdevice-exports.yml" UNSAFE)
 
 add_custom_target(usbdevice_all
   ALL

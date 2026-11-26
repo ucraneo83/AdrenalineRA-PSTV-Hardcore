@@ -237,6 +237,9 @@ int ScePspemuBuildFlash0(void) {
 }
 
 int ScePspemuLoadFlash0Ark(void) {
+#if ADRENALINE_TEST_PROFILE
+	return -1;
+#else
 	// read flash0 ark package
 	char ark_path[64];
 	snprintf(ark_path, sizeof(ark_path), "%s" FLASH0_ARK_PATH, getPspemuMemoryStickLocation());
@@ -280,4 +283,5 @@ int ScePspemuLoadFlash0Ark(void) {
 	sceKernelFreeMemBlock(flash0_blockid);
 
 	return 0;
+#endif
 }

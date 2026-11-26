@@ -139,9 +139,9 @@ static int game_page_gate(RaRuntimeInfo *info) {
      * else - no Game/RA State/rich-presence rows, no Achievements/Leaderboards/
      * Options navigation, no Active Challenges list. */
   if (info->unsupported) {
-    ra_menu_add_text("RetroAchievements does not support this game.", ORANGE);
+    ra_menu_add_text("RetroAchievements did not recognize this game file.", ORANGE);
     ra_menu_add_text("Achievements and leaderboards are unavailable here.", LITEGRAY);
-    ra_menu_add_text("This game is not in the RetroAchievements database.", LITEGRAY);
+    ra_menu_add_text("See Supported Game Hashes on the game's RetroAchievements page.", LITEGRAY);
     return 1;
   }
   return 0;

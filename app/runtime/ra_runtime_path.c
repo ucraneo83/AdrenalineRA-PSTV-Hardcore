@@ -14,6 +14,16 @@
 #include "../../third_party/Adrenaline/user/utils.h"
 
 int ra_runtime_translate_psp_path(const char *input, char *output, size_t capacity) {
+#if ADRENALINE_TEST_PROFILE
+  if (!input || strncmp(input, "ms0:/", 5) != 0 || !isTestPspRelativePath(input + 4))
+    return 0;
+
+  const char *iso_suffix = getTestIsoSuffix(input + 4);
+  int length = iso_suffix
+      ? snprintf(output, capacity, "%s%s", ADRENALINE_TEST_ISO_ROOT, iso_suffix)
+      : snprintf(output, capacity, "%s%s", getPspemuMemoryStickLocation(), input + 4);
+  return length >= 0 && (size_t)length < capacity;
+#else
   const char *prefix = NULL;
 
   if (input == NULL || input[0] == '\0')
@@ -28,6 +38,7 @@ int ra_runtime_translate_psp_path(const char *input, char *output, size_t capaci
   else
     snprintf(output, capacity, "%s", input);
   return 1;
+#endif
 }
 
 int ra_runtime_file_exists(const char *path) {
@@ -122,7 +133,11 @@ int ra_runtime_resolve_game_path(const char *filename, const char *titleid,
   for (i = 0; i < 2; ++i) {
     if (roots[i] == NULL)
       continue;
+#if ADRENALINE_TEST_PROFILE
+    snprintf(root, sizeof(root), "%s", ADRENALINE_TEST_ISO_ROOT);
+#else
     snprintf(root, sizeof(root), "%s/ISO", roots[i]);
+#endif
     if (ra_runtime_scan_for_title(root, titleid, output, capacity, 0))
       return 1;
     snprintf(root, sizeof(root), "%s/PSP/GAME", roots[i]);

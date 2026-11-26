@@ -14,15 +14,16 @@ foreach(BTCNF IN LISTS BTCNFS)
   list(GET kv 0 BTCNF_NAME)
   list(GET kv 1 FOLDER)
 
-  set(BTCNF_PATH_NOEXT "${CMAKE_CURRENT_LIST_DIR}/${FOLDER}/pspbtcnf")
+  set(BTCNF_SOURCE "${CMAKE_CURRENT_LIST_DIR}/${FOLDER}/pspbtcnf.txt")
   list(APPEND BTCNF_BIN_FILES "${BTCNF_NAME}.bin")
 
   add_custom_command(
     OUTPUT ${BTCNF_NAME}.bin
-    DEPENDS "${BTCNF_PATH_NOEXT}.txt"
-    COMMAND python3 ${BTCNF_SCRIPT} build "${BTCNF_PATH_NOEXT}.txt"
-    COMMAND ${CMAKE_COMMAND} -E copy "${BTCNF_PATH_NOEXT}.bin" ${BTCNF_NAME}.bin
-    COMMAND ${CMAKE_COMMAND} -E copy "${BTCNF_PATH_NOEXT}.bin" "${FLASH0_DIR}/kd/${BTCNF_NAME}.bin"
+    DEPENDS "${BTCNF_SOURCE}" "${BTCNF_SCRIPT}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${BTCNF_SOURCE}" "${BTCNF_NAME}.txt"
+    COMMAND python3 "${BTCNF_SCRIPT}" build "${BTCNF_NAME}.txt"
+    COMMAND ${CMAKE_COMMAND} -E copy "${BTCNF_NAME}.bin" "${FLASH0_DIR}/kd/${BTCNF_NAME}.bin"
+    VERBATIM
   )
 endforeach()
 

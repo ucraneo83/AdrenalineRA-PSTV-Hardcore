@@ -416,7 +416,7 @@ void ra_settings_load(RaSettings *settings) {
   ra_settings_defaults(settings);
   g_auth_state = RA_SETTINGS_AUTH_DEFAULTS;
   ensure_dir("ur0:data");
-  ensure_dir("ur0:data/AdrenalineRA");
+  ensure_dir(RA_DATA_ROOT_UR0);
   ensure_dir("ux0:data");
   ensure_dir(RA_SETTINGS_DIR);
 
@@ -444,7 +444,7 @@ int ra_settings_save(const RaSettings *settings) {
   if (settings == NULL)
     return -1;
   ensure_dir("ur0:data");
-  ensure_dir("ur0:data/AdrenalineRA");
+  ensure_dir(RA_DATA_ROOT_UR0);
   ensure_dir("ux0:data");
   ensure_dir(RA_SETTINGS_DIR);
 

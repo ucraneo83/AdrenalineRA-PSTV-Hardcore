@@ -18,6 +18,7 @@
 
 #include <psp2/appmgr.h>
 #include <psp2/ctrl.h>
+#include <psp2/kernel/threadmgr.h>
 #include <psp2/sysmodule.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/devctl.h>
@@ -34,6 +35,7 @@
 #include "pspdebug.h"
 
 #include "../adrenaline_vita.h"
+#include "../adrenaline_replacement.h"
 
 #define printf psvDebugScreenPrintf
 
@@ -254,6 +256,18 @@ int main() {
 
 	psvDebugScreenInit();
 
+	if (ADRENALINE_TEST_PROFILE && !ADRENALINE_TEST_REPLACEMENT) {
+		printf("AdrenalineRA Test cannot start until module isolation is ready.\n");
+		return 1;
+	}
+
+#if ADRENALINE_TEST_REPLACEMENT
+	if (!adrenaline_original_app_is_absent(sceIoGetstat)) {
+		printf("Remove the original Adrenaline app and restart the PSTV before using Test.\n");
+		return 1;
+	}
+#endif
+
 	// Safe mode
 	if (sceIoDevctl("ux0:", 0x3001, NULL, 0, NULL, 0) == 0x80010030) {
 		printf("Please enable unsafe homebrew first before using this software.");
@@ -263,6 +277,17 @@ int main() {
 	// Enable write access
 	sceAppMgrUmount("app0:");
 
+#if ADRENALINE_TEST_REPLACEMENT
+	SceIoStat firmware;
+	sceIoMkdir(ADRENALINE_TEST_DATA_ROOT, 0777);
+	if ((sceIoGetstat(ADRENALINE_TEST_DATA_ROOT "/flash0", &firmware) < 0 ||
+	     !SCE_S_ISDIR(firmware.st_mode)) &&
+	    (sceIoGetstat(ADRENALINE_TEST_DATA_ROOT "/661.PBP", &firmware) < 0 ||
+	     !SCE_S_ISREG(firmware.st_mode) || firmware.st_size <= 0)) {
+		printf("Copy the PSP 6.61 firmware as " ADRENALINE_TEST_DATA_ROOT "/661.PBP.\n");
+		return 1;
+	}
+#else
 	if (check_firmware_install()) {
 		printf("The 6.61 firmware has not been installed yet and 661.PBP does not\nexist.\n");
 		printf("Press X to download the PSP 6.61 firmware.\n");
@@ -289,12 +314,38 @@ int main() {
 	}
 
 	install_kd_modules();
+#endif
 
 	// Load kernel module
+#if ADRENALINE_TEST_REPLACEMENT
+	sceIoRemove(ADRENALINE_START_LOG);
+#endif
 	res = taiLoadStartKernelModule("ux0:app/" ADRENALINE_TITLEID "/sce_module/adrenaline_kernel.skprx", 0, NULL, 0);
 	if (res < 0) {
+#if ADRENALINE_TEST_REPLACEMENT
+		printf("AdrenalineRA Test 01.06: kernel load failed 0x%08X.\n", (unsigned int)res);
+		SceUID log = sceIoOpen(ADRENALINE_START_LOG, SCE_O_RDONLY, 0);
+		if (log >= 0) {
+			char text[160];
+			int length = sceIoRead(log, text, sizeof(text) - 1);
+			sceIoClose(log);
+			if (length > 0) {
+				text[length] = '\0';
+				printf("%s\n", text);
+			}
+		}
+		printf("Photograph this screen. Press X to exit.\n");
+		do {
+			SceCtrlData pad;
+			if (sceCtrlPeekBufferPositive(0, &pad, 1) >= 0 && (pad.buttons & SCE_CTRL_CROSS))
+				break;
+			sceKernelDelayThread(100000);
+		} while (1);
+		return 1;
+#else
 		printf("Could not load adrenaline_kernel.skprx. Please uninstall the old Adrenaline first.");
 		while (1);
+#endif
 	}
 
     // TODO: delay and re-launch

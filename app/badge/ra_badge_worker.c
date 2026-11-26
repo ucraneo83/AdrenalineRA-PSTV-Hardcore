@@ -262,7 +262,7 @@ void ra_badge_init(void) {
   g_badge_stalled = 0;
   g_badge_downloads = 0;
   g_badge_failures = 0;
-  sceIoMkdir("ux0:data/AdrenalineRA", 0777);
+  sceIoMkdir(RA_DATA_ROOT_UX0, 0777);
   sceIoMkdir(RA_BADGE_DIR, 0777);
 }
 

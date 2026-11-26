@@ -24,6 +24,8 @@
 
 #include <taihen.h>
 
+#include "adrenaline_identity.h"
+
 static tai_hook_ref_t ksceIoOpenRef;
 static tai_hook_ref_t ksceIoReadRef;
 
@@ -65,6 +67,10 @@ static int ksceIoReadPatched(SceUID fd, void *data, SceSize size) {
 
 void _start() __attribute__ ((weak, alias("module_start")));
 int module_start(SceSize args, void *argp) {
+  if (ADRENALINE_TEST_PROFILE) {
+    return SCE_KERNEL_START_FAILED;
+  }
+
   // Get tai module info
   tai_module_info_t info;
   info.size = sizeof(tai_module_info_t);

@@ -28,6 +28,9 @@
 
 #include "main.h"
 #include "menu.h"
+#if ADRENALINE_TEST_PROFILE
+#include "msfs.h"
+#endif
 #include "pops.h"
 #include "ra_logqueue.h"
 #include "ra_runtime.h"
@@ -120,7 +123,150 @@ int ScePspemuConvertAddressPatched(uint32_t addr, int mode, uint32_t cache_size)
 	return TAI_CONTINUE(int, ScePspemuConvertAddressRef, addr, mode, cache_size);
 }
 
+#if ADRENALINE_TEST_PROFILE
+static int isTestNativeStorageRoot(const char *path, const char *root) {
+	size_t length = strlen(root);
+	return strncmp(path, root, length) == 0 &&
+	       (path[length] == '\0' || path[length] == '/');
+}
+
+static int isTestPspemuSystemRead(const char *file, const char *path) {
+	if (strncmp(file, "ur0:", 4) == 0) {
+		return strcmp(path, "emu_list") == 0 || strcmp(path, "emu_list/compat_info.dat") == 0;
+	}
+
+	const char workspace_prefix[] = "temp/pspemu/w";
+	if (strncmp(file, "ux0:", 4) != 0 ||
+	    strncmp(path, workspace_prefix, sizeof(workspace_prefix) - 1) != 0) {
+		return 0;
+	}
+
+	const char *slot = path + sizeof(workspace_prefix) - 1;
+	return strlen(slot) == 6 && strcmp(slot + 2, ".bin") == 0 &&
+	       slot[1] >= '0' && ((slot[0] == '0' && slot[1] <= '9') ||
+	                          (slot[0] == '1' && slot[1] <= '5'));
+}
+
+static int translateTestNativePath(const char *file, int read_only, char *output, size_t capacity) {
+	if (!file || !memchr(file, '\0', MAX_PATH_LENGTH)) {
+		return 0;
+	}
+
+	const char *device_end = strchr(file, ':');
+	if (!device_end || device_end - file != 3) {
+		return 0;
+	}
+	const char *path = device_end + 1;
+	while (*path == '/') {
+		path++;
+	}
+	if (!isTestPspRelativePath(path)) {
+		return 0;
+	}
+
+	int length;
+	const char *ms_path = NULL;
+	if (strncmp(file, "ms0:", 4) == 0) {
+		ms_path = path;
+	} else if (strncmp(file, "ux0:", 4) == 0 && isTestNativeStorageRoot(path, "pspemu")) {
+		ms_path = path + sizeof("pspemu") - 1;
+		while (*ms_path == '/') {
+			ms_path++;
+		}
+	}
+
+	if (ms_path) {
+		const char *iso_suffix = getTestIsoSuffix(ms_path);
+		if (iso_suffix && !read_only) {
+			return 0;
+		}
+		length = iso_suffix
+			? snprintf(output, capacity, "%s%s", ADRENALINE_TEST_ISO_ROOT, iso_suffix)
+			: snprintf(output, capacity, "%s/%s", ADRENALINE_TEST_MS_ROOT, ms_path);
+	} else if ((strncmp(file, "ux0:", 4) == 0 &&
+	            (isTestNativeStorageRoot(path, "data/" ADRENALINE_TITLEID) ||
+	             (read_only && isTestNativeStorageRoot(path, "app/" ADRENALINE_TITLEID)))) ||
+	           (read_only && (strncmp(file, "os0:", 4) == 0 || strncmp(file, "vs0:", 4) == 0 ||
+	                         isTestPspemuSystemRead(file, path)))) {
+		length = snprintf(output, capacity, "%.4s%s", file, path);
+	} else {
+		return 0;
+	}
+	return length >= 0 && (size_t)length < capacity;
+}
+
+static int buildTestPopsPath(const char *file, int read_only, char *output, size_t capacity) {
+	if (!file || !memchr(file, '\0', MAX_PATH_LENGTH)) {
+		return 0;
+	}
+
+	const char *name = strrchr(file, '/');
+	name = name ? name + 1 : file;
+	int menu_info = strcmp(name, "__sce_menuinfo") == 0;
+	int savedata = strcmp(name, "PARAM.SFO") == 0 || strcmp(name, "SCEVMC0.VMP") == 0 ||
+	               strcmp(name, "SCEVMC1.VMP") == 0;
+	if (!menu_info && !savedata) {
+		return translateTestNativePath(file, read_only, output, capacity);
+	}
+
+	// POPS can supply a native path from the original memory stick.
+	// Validate its syntax before rebasing the special file into Test data.
+	const char *device_end = strchr(file, ':');
+	const char *relative = file;
+	if (device_end) {
+		if (device_end - file != 3 || (strncmp(file, "ux0:", 4) != 0 && strncmp(file, "ms0:", 4) != 0)) {
+			return 0;
+		}
+		relative = device_end + 1;
+	}
+	if (!isTestPspRelativePath(relative)) {
+		return 0;
+	}
+
+	const SceAdrenaline *adrenaline = (const SceAdrenaline *)ScePspemuConvertAddress(
+		ADRENALINE_ADDRESS, KERMIT_INPUT_MODE, ADRENALINE_SIZE);
+	if (!adrenaline) {
+		return 0;
+	}
+
+	int length;
+	if (menu_info) {
+		char filename[sizeof(adrenaline->filename)];
+		memcpy(filename, adrenaline->filename, sizeof(filename));
+		if (!memchr(filename, '\0', sizeof(filename)) || strncmp(filename, "ms0:/", 5) != 0 ||
+		    !isTestPspRelativePath(filename + 5)) {
+			return 0;
+		}
+		char *directory_end = strrchr(filename, '/');
+		if (directory_end[1] == '\0') {
+			return 0;
+		}
+		*directory_end = '\0';
+		const char *directory = directory_end == filename + 4 ? "" : filename + 5;
+		length = snprintf(output, capacity, "%s/%s%s%s", ADRENALINE_TEST_MS_ROOT,
+		                  directory, *directory ? "/" : "", name);
+	} else {
+		char title_id[sizeof(adrenaline->titleid)];
+		memcpy(title_id, adrenaline->titleid, sizeof(title_id));
+		if (!memchr(title_id, '\0', sizeof(title_id)) || title_id[0] == '\0' ||
+		    title_id[strspn(title_id, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")] != '\0') {
+			return 0;
+		}
+		length = snprintf(output, capacity, "%s/PSP/SAVEDATA/%s/%s", ADRENALINE_TEST_MS_ROOT, title_id, name);
+	}
+	return length >= 0 && (size_t)length < capacity;
+}
+#endif
+
 SceUID sceIoOpenPatched(const char *file, int flags, SceMode mode) {
+#if ADRENALINE_TEST_PROFILE
+	char new_file[MAX_PATH_LENGTH];
+	if (!buildTestPopsPath(file, isTestReadOnlyOpen(flags), new_file, sizeof(new_file))) {
+		logTestPathError("Native open rejected", file, flags, SCE_EINVAL);
+		return SCE_EINVAL;
+	}
+	file = new_file;
+#else
 	char *p = strrchr(file, '/');
 	if (p) {
 		static char new_file[256];
@@ -145,11 +291,20 @@ SceUID sceIoOpenPatched(const char *file, int flags, SceMode mode) {
 			file = new_file;
 		}
 	}
+#endif
 
 	return TAI_CONTINUE(SceUID, sceIoOpenRef, file, flags, mode);
 }
 
 int sceIoGetstatPatched(const char *file, SceIoStat *stat) {
+#if ADRENALINE_TEST_PROFILE
+	char new_file[MAX_PATH_LENGTH];
+	if (!buildTestPopsPath(file, 1, new_file, sizeof(new_file))) {
+		logTestPathError("Native stat rejected", file, 0, SCE_EINVAL);
+		return SCE_EINVAL;
+	}
+	file = new_file;
+#else
 	char *p = strrchr(file, '/');
 	if (p) {
 		static char new_file[256];
@@ -161,6 +316,7 @@ int sceIoGetstatPatched(const char *file, SceIoStat *stat) {
 			file = new_file;
 		}
 	}
+#endif
 
 	return TAI_CONTINUE(int, sceIoGetstatRef, file, stat);
 }

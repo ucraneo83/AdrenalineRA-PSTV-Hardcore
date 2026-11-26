@@ -1,6 +1,7 @@
 #ifndef ADRENALINE_VITA_H
 #define ADRENALINE_VITA_H
 
+#include "adrenaline_identity.h"
 #include "ra_gate.h"
 
 // NOTE: these definitions already exist in PSPSDK, but not on VITASDK
@@ -8,8 +9,6 @@
 
 #define REBOOTEX_CONFIG 0x88FB0000
 #define REBOOTEX_TEXT 0x88FC0000
-
-#define ADRENALINE_TITLEID "PSPEMUCFW"
 
 #define SCE_PSPEMU_FLASH0_PACKAGE_SIZE 0x920000
 #define SCE_PSPEMU_EXTRA_MEMORY 0x8B000000

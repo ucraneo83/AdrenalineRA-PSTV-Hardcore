@@ -7,13 +7,13 @@ add_cef_prx(janus
     pspsdk
     tinyfont
   LINK_STUBS
+    pspsystemctrl_kernel
     pspkernel
     pspctrl_driver
     pspsysclib_kernel
     pspdisplay_driver
     pspisoctrl_driver
 	pspreg_driver
-    pspsystemctrl_kernel
 )
 
 target_include_directories(vshctrl PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

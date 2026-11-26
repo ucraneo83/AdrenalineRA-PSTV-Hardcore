@@ -21,6 +21,14 @@
 
 #include <stdint.h>
 #include <psp2common/types.h>
+#include "adrenaline_identity.h"
+
+#if ADRENALINE_TEST_PROFILE
+int isTestPspRelativePath(const char *path);
+const char *getTestIsoSuffix(const char *path);
+int isTestReadOnlyOpen(int flags);
+void logTestPathError(const char *operation, const char *path, int flags, int result);
+#endif
 
 #define ANALOG_CENTER 128
 #define ANALOG_THRESHOLD 64

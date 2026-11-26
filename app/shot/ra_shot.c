@@ -1,4 +1,5 @@
 #include "ra_shot.h"
+#include "adrenaline_identity.h"
 
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
@@ -14,7 +15,7 @@
 #include "ra_logqueue.h"
 #include "ra_runtime.h"
 
-#define SHOT_DIR "ux0:data/AdrenalineRA/screenshots"
+#define SHOT_DIR RA_DATA_ROOT_UX0 "/screenshots"
 #define SHOT_QUEUE 4
 #define COPY_QUEUE 8
 #define FOLDER_MAX 48
@@ -135,7 +136,7 @@ static int copy_file(const char *source, const ShotJob *job) {
 
   if (source == NULL || source[0] == '\0' || job == NULL)
     return 0;
-  sceIoMkdir("ux0:data/AdrenalineRA", 0777);
+  sceIoMkdir(RA_DATA_ROOT_UX0, 0777);
   sceIoMkdir(SHOT_DIR, 0777);
   snprintf(folder, sizeof(folder), "%s/%s", SHOT_DIR, job->folder);
   sceIoMkdir(folder, 0777);
@@ -271,7 +272,7 @@ static void shot_fill_raw(const uint32_t *source, size_t pitch, int width, int h
 static int shot_open_output(const ShotJob *job, char *path, size_t capacity) {
   char folder[FOLDER_MAX + 40];
 
-  sceIoMkdir("ux0:data/AdrenalineRA", 0777);
+  sceIoMkdir(RA_DATA_ROOT_UX0, 0777);
   sceIoMkdir(SHOT_DIR, 0777);
   snprintf(folder, sizeof(folder), "%s/%s", SHOT_DIR, job->folder);
   sceIoMkdir(folder, 0777);
@@ -476,7 +477,7 @@ void ra_shot_init(void) {
       sceKernelStartThread(g_copy_thread, 0, NULL);
   }
   if (!g_dirs_ready) {
-    sceIoMkdir("ux0:data/AdrenalineRA", 0777);
+    sceIoMkdir(RA_DATA_ROOT_UX0, 0777);
     sceIoMkdir(SHOT_DIR, 0777);
     g_dirs_ready = 1;
   }

@@ -2,15 +2,16 @@
 #define RA_SETTINGS_H
 
 #include <stdint.h>
+#include "adrenaline_identity.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define RA_SETTINGS_DIR "ux0:data/AdrenalineRA"
+#define RA_SETTINGS_DIR RA_DATA_ROOT_UX0
 #define RA_SETTINGS_POLICY_PATH RA_SETTINGS_DIR "/RA_POLICY.TXT"
-#define RA_SETTINGS_BIN_UR0 "ur0:data/AdrenalineRA/ra_settings.bin"
-#define RA_SETTINGS_BIN_UX0 "ux0:data/AdrenalineRA/ra_settings.bin"
+#define RA_SETTINGS_BIN_UR0 RA_DATA_ROOT_UR0 "/ra_settings.bin"
+#define RA_SETTINGS_BIN_UX0 RA_DATA_ROOT_UX0 "/ra_settings.bin"
 #define POLICY_VERSION 8
 
 typedef struct {

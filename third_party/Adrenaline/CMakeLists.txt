@@ -1,5 +1,16 @@
 cmake_minimum_required(VERSION 3.28)
 
+set(ADRENALINE_PROFILE "standard" CACHE STRING "Adrenaline build profile")
+set_property(CACHE ADRENALINE_PROFILE PROPERTY STRINGS standard test)
+option(ADRENALINE_TEST_REPLACEMENT "Build Test for an installation without original Adrenaline" OFF)
+if(ADRENALINE_PROFILE STREQUAL "test" AND NOT ADRENALINE_TEST_REPLACEMENT)
+  message(FATAL_ERROR "AdrenalineRA Test builds are disabled for parallel use. A replacement build requires ADRENALINE_TEST_REPLACEMENT=ON.")
+elseif(ADRENALINE_TEST_REPLACEMENT AND NOT ADRENALINE_PROFILE STREQUAL "test")
+  message(FATAL_ERROR "ADRENALINE_TEST_REPLACEMENT requires the test profile")
+endif()
+include(cmake/AdrenalineIdentity.cmake)
+include(cmake/AdrenalineFlash0.cmake)
+
 if(NOT DEFINED ENV{VITASDK})
     message(FATAL_ERROR "Please define VITASDK to point to your vita SDK path!")
 endif()
@@ -39,6 +50,7 @@ message(STATUS "AdrenalineRA base: Adrenaline ${RA_ADRENALINE_BASE_MAJOR}.${RA_A
 # The RA gate record and crypto helpers live in the repo-level core/server tree.
 # All Vita targets that include adrenaline_vita.h need this include path.
 include_directories(${CMAKE_SOURCE_DIR}/../../core/server)
+include_directories("${ADRENALINE_IDENTITY_INCLUDE_DIR}")
 
 set(NIGHTLY_CMAKE_PARAM "")
 set(NIGHTLY_MAKE_PARAM "")

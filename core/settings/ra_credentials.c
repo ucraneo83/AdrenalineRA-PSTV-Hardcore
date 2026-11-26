@@ -84,7 +84,7 @@ int ra_credentials_save(const char *username, const char *token,
   }
 
   ensure_dir("ur0:data");
-  ensure_dir("ur0:data/AdrenalineRA");
+  ensure_dir(RA_DATA_ROOT_UR0);
   ensure_dir("ux0:data");
   ensure_dir(RA_SETTINGS_DIR);
 

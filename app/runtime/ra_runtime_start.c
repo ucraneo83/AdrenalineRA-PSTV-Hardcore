@@ -252,7 +252,7 @@ static int session_unsupported_check(void) {
     g_rt.info.ready = 0;
     g_rt.info.unsupported = 1;
     ra_runtime_copy_text(g_rt.info.status, sizeof(g_rt.info.status),
-        "RetroAchievements does not support this game");
+        "RetroAchievements did not recognize this game file");
     ra_runtime_unlock();
     ra_runtime_log("runtime: unsupported game titleid='%s'; automatic retry stopped\n",
           g_rt.game_titleid);

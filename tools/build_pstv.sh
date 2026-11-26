@@ -17,5 +17,6 @@ cmake --build "$BUILD_DIR" --target libvita2dfbo vitashadercollection -j4
 cmake --build "$BUILD_DIR" --target Adrenaline.vpk-vpk -j4
 VPK="$BUILD_DIR/bubble/Adrenaline.vpk"
 test -s "$VPK" || { echo "VPK missing: $VPK" >&2; exit 3; }
+python3 "$ROOT/tools/audit_psp_prx.py" "$ROOT/third_party/Adrenaline/user/flash0" --vpk "$VPK"
 sha256sum "$VPK" > "$VPK.sha256"
 echo "Built: $VPK"

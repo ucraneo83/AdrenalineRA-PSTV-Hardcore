@@ -4,12 +4,13 @@
 /* Timestamped per-session logs shared by the bubble, pspemu module and menu. */
 
 #include <psp2/io/fcntl.h>
+#include "adrenaline_identity.h"
 #include <psp2/io/stat.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/rtc.h>
 #include <string.h>
 
-#define RA_LOG_ROOT "ux0:data/AdrenalineRA"
+#define RA_LOG_ROOT RA_DATA_ROOT_UX0
 #define RA_LOG_DIR RA_LOG_ROOT "/logs"
 #define RA_LOG_SESSION RA_LOG_ROOT "/RA_SESSION"
 #define RA_LOG_CONTINUE RA_LOG_ROOT "/RA_SETUP.CONTINUE"
