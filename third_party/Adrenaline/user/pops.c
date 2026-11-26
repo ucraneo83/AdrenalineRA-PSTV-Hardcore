@@ -180,9 +180,22 @@ static int translateTestNativePath(const char *file, int read_only, char *output
 		if (iso_suffix && !read_only) {
 			return 0;
 		}
-		length = iso_suffix
-			? snprintf(output, capacity, "%s%s", ADRENALINE_TEST_ISO_ROOT, iso_suffix)
-			: snprintf(output, capacity, "%s/%s", ADRENALINE_TEST_MS_ROOT, ms_path);
+		if (iso_suffix) {
+			length = snprintf(output, capacity, "%s%s", ADRENALINE_TEST_ISO_ROOT, iso_suffix);
+			return length >= 0 && (size_t)length < capacity;
+		}
+		// PS1 and PSP EBOOTs are read from the existing PSP/GAME folder, so POPS
+		// can open the games listed by the PSP menu. Writes and files that only
+		// exist on the Test memory stick keep using the Test copy.
+		const char *game_suffix = getTestGameSuffix(ms_path);
+		if (game_suffix && read_only) {
+			SceIoStat stat;
+			length = snprintf(output, capacity, "%s%s", ADRENALINE_TEST_GAME_ROOT, game_suffix);
+			if (length >= 0 && (size_t)length < capacity && sceIoGetstat(output, &stat) >= 0) {
+				return 1;
+			}
+		}
+		length = snprintf(output, capacity, "%s/%s", ADRENALINE_TEST_MS_ROOT, ms_path);
 	} else if ((strncmp(file, "ux0:", 4) == 0 &&
 	            (isTestNativeStorageRoot(path, "data/" ADRENALINE_TITLEID) ||
 	             (read_only && isTestNativeStorageRoot(path, "app/" ADRENALINE_TITLEID)))) ||
@@ -193,6 +206,28 @@ static int translateTestNativePath(const char *file, int read_only, char *output
 		return 0;
 	}
 	return length >= 0 && (size_t)length < capacity;
+}
+
+// Memory cards (PSP/SAVEDATA/<id>) and __sce_menuinfo are rebased into the Test
+// memory stick, where the game's folder may not exist yet. Create the missing
+// folders below the Test memory stick root before POPS creates the file.
+static void ensureTestParentDirectories(const char *path) {
+	const size_t root_length = sizeof(ADRENALINE_TEST_MS_ROOT) - 1;
+	char directory[MAX_PATH_LENGTH];
+	size_t length = strlen(path);
+
+	if (length >= sizeof(directory) || strncmp(path, ADRENALINE_TEST_MS_ROOT, root_length) != 0 ||
+	    path[root_length] != '/') {
+		return;
+	}
+	memcpy(directory, path, length + 1);
+	for (size_t i = root_length + 1; i < length; i++) {
+		if (directory[i] == '/') {
+			directory[i] = '\0';
+			sceIoMkdir(directory, 0777);
+			directory[i] = '/';
+		}
+	}
 }
 
 static int buildTestPopsPath(const char *file, int read_only, char *output, size_t capacity) {
@@ -261,9 +296,13 @@ static int buildTestPopsPath(const char *file, int read_only, char *output, size
 SceUID sceIoOpenPatched(const char *file, int flags, SceMode mode) {
 #if ADRENALINE_TEST_PROFILE
 	char new_file[MAX_PATH_LENGTH];
-	if (!buildTestPopsPath(file, isTestReadOnlyOpen(flags), new_file, sizeof(new_file))) {
+	int read_only = isTestReadOnlyOpen(flags);
+	if (!buildTestPopsPath(file, read_only, new_file, sizeof(new_file))) {
 		logTestPathError("Native open rejected", file, flags, SCE_EINVAL);
 		return SCE_EINVAL;
+	}
+	if (!read_only && (flags & SCE_O_CREAT)) {
+		ensureTestParentDirectories(new_file);
 	}
 	file = new_file;
 #else

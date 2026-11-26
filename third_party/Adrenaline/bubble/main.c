@@ -323,7 +323,7 @@ int main() {
 	res = taiLoadStartKernelModule("ux0:app/" ADRENALINE_TITLEID "/sce_module/adrenaline_kernel.skprx", 0, NULL, 0);
 	if (res < 0) {
 #if ADRENALINE_TEST_REPLACEMENT
-		printf("AdrenalineRA Test 01.06: kernel load failed 0x%08X.\n", (unsigned int)res);
+		printf("AdrenalineRA Test 01.07: kernel load failed 0x%08X.\n", (unsigned int)res);
 		SceUID log = sceIoOpen(ADRENALINE_START_LOG, SCE_O_RDONLY, 0);
 		if (log >= 0) {
 			char text[160];

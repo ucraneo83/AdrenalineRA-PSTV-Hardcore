@@ -26,6 +26,7 @@
 #if ADRENALINE_TEST_PROFILE
 int isTestPspRelativePath(const char *path);
 const char *getTestIsoSuffix(const char *path);
+const char *getTestGameSuffix(const char *path);
 int isTestReadOnlyOpen(int flags);
 void logTestPathError(const char *operation, const char *path, int flags, int result);
 #endif

@@ -361,6 +361,18 @@ const char *getTestIsoSuffix(const char *path) {
 	}
 	return NULL;
 }
+
+// PSP/GAME holds PSP homebrew and PS1 (POPS) EBOOTs. Like ISO, it is read from
+// the existing memory stick so games installed there appear in the Test menu.
+const char *getTestGameSuffix(const char *path) {
+	while (*path == '/') {
+		path++;
+	}
+	if (strncasecmp(path, "PSP/GAME", 8) == 0 && (path[8] == '/' || path[8] == '\0')) {
+		return path + 8;
+	}
+	return NULL;
+}
 #endif
 
 char *getPspemuMemoryStickLocation(void) {

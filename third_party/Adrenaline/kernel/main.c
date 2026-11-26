@@ -138,6 +138,16 @@ static void load_process_module(ProcessModule *module, SceUID pid, const char *n
 	if (pid <= 0 || !lock_process_module(module)) {
 		return;
 	}
+	// A record from another process (normally the Adrenaline instance that was
+	// closed before this launch) says nothing about the new process. Querying the
+	// exited PID can return an error that is not recognised as "gone", which used
+	// to keep the stale record, skip the injection and crash the reopened bubble
+	// with C1-2758-2. Only the new PID decides whether the module is present.
+	if (module->module_id >= 0 && module->pid != pid) {
+		module->module_id = -1;
+		module->pid = -1;
+		module->owned = 0;
+	}
 	if (kernel_hooks_active() && !process_module_is_present(module, name)) {
 		tai_module_info_t info = { .size = sizeof(info) };
 		int lookup = taiGetModuleInfoForKernel(pid, name, &info);

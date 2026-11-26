@@ -19,9 +19,20 @@ int ra_runtime_translate_psp_path(const char *input, char *output, size_t capaci
     return 0;
 
   const char *iso_suffix = getTestIsoSuffix(input + 4);
-  int length = iso_suffix
-      ? snprintf(output, capacity, "%s%s", ADRENALINE_TEST_ISO_ROOT, iso_suffix)
-      : snprintf(output, capacity, "%s%s", getPspemuMemoryStickLocation(), input + 4);
+  const char *game_suffix = getTestGameSuffix(input + 4);
+  int length;
+  if (iso_suffix) {
+    length = snprintf(output, capacity, "%s%s", ADRENALINE_TEST_ISO_ROOT, iso_suffix);
+    return length >= 0 && (size_t)length < capacity;
+  }
+  /* Same order as the emulator: the shared PSP/GAME folder first (PSP and PS1
+   * EBOOTs), then the Test memory stick. */
+  if (game_suffix) {
+    length = snprintf(output, capacity, "%s%s", ADRENALINE_TEST_GAME_ROOT, game_suffix);
+    if (length >= 0 && (size_t)length < capacity && ra_runtime_file_exists(output))
+      return 1;
+  }
+  length = snprintf(output, capacity, "%s%s", getPspemuMemoryStickLocation(), input + 4);
   return length >= 0 && (size_t)length < capacity;
 #else
   const char *prefix = NULL;
@@ -140,6 +151,11 @@ int ra_runtime_resolve_game_path(const char *filename, const char *titleid,
 #endif
     if (ra_runtime_scan_for_title(root, titleid, output, capacity, 0))
       return 1;
+#if ADRENALINE_TEST_PROFILE
+    snprintf(root, sizeof(root), "%s", ADRENALINE_TEST_GAME_ROOT);
+    if (ra_runtime_scan_for_title(root, titleid, output, capacity, 0))
+      return 1;
+#endif
     snprintf(root, sizeof(root), "%s/PSP/GAME", roots[i]);
     if (ra_runtime_scan_for_title(root, titleid, output, capacity, 0))
       return 1;

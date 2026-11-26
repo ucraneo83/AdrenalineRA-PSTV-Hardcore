@@ -12,7 +12,7 @@ project(adrenaline)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 set(VITA_VERSION  "01.01")
 if(ADRENALINE_TEST_REPLACEMENT)
-  set(VITA_VERSION "01.06")
+  set(VITA_VERSION "01.07")
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-q -Wall -O3")

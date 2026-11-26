@@ -62,6 +62,15 @@ static int buildPspemuMsfsPath(char *out_path, const char *in_path, int flash_pa
 		return (length < 0 || length >= MAX_PATH_LENGTH) ? SCE_EINVAL : 0;
 	}
 
+	// Reads of PSP/GAME (PSP and PS1 EBOOTs) come from the existing memory stick.
+	// A miss there is retried as FLASH_APP, which lands on the Test memory stick
+	// below, and so do all writes: the shared game folders are never modified.
+	const char *game_suffix = getTestGameSuffix(in_path);
+	if (game_suffix && read_only && flash_path == FLASH_DATA) {
+		int length = snprintf(out_path, MAX_PATH_LENGTH, "%s%s", ADRENALINE_TEST_GAME_ROOT, game_suffix);
+		return (length < 0 || length >= MAX_PATH_LENGTH) ? SCE_EINVAL : 0;
+	}
+
 	const char *base = ADRENALINE_TEST_MS_ROOT;
 	if (strncmp(in_path, "__ADRENALINE__", 14) == 0 && (in_path[14] == '/' || in_path[14] == '\0')) {
 		base = flash_path == FLASH_APP ? "ux0:app/" ADRENALINE_TITLEID : ADRENALINE_TEST_DATA_ROOT;
